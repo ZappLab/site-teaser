@@ -1,7 +1,8 @@
-// import {OrbitControls} from 'https://unpkg.com/three@0.127.0/examples/jsm/controls/OrbitControls.js'
 import * as THREE from 'https://unpkg.com/three@0.127.0/build/three.module.js';
-const canvas = document.querySelector('canvas.webgl')
 
+const canvas = document.querySelector('canvas.webgl')
+console.log(window.innerWidth)
+console.log(window.innerHeight)
 const maxTime = 360
 const size = 10
 const showingOrigin = false
