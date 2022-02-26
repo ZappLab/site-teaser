@@ -1,6 +1,5 @@
 import * as THREE from 'https://unpkg.com/three@0.127.0/build/three.module.js';
 
-const canvas = document.querySelector('canvas.webgl')
 console.log(window.innerWidth)
 console.log(window.innerHeight)
 const maxTime = 360
@@ -212,7 +211,7 @@ function init() {
 
   time = 0
   camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 100)
-  camera.position.z = 60
+  camera.position.z = 50
 
   scene = new THREE.Scene()
   whole = new THREE.Group()
