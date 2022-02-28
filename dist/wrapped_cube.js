@@ -1,15 +1,9 @@
 import * as THREE from 'https://unpkg.com/three@0.127.0/build/three.module.js';
 
-const maxTime = 360
 const size = 10
 const showingOrigin = false
-const xInit = -1
-const yInit = 0
-const zInit = -1
 
-var camera, scene, renderer
-
-var whole, wrapper, globalTime, time
+var camera, scene, renderer, whole, wrapper, time
 
 class CubePosition extends THREE.Vector3 {
   static p000 = new CubePosition(0, 0, 0)
@@ -27,6 +21,7 @@ class Direction extends THREE.Vector3 {
   static negY = new Direction(0, -1, 0)
   static posZ = new Direction(0, 0, 1)
   static negZ = new Direction(0, 0, -1)
+
   constructor(x, y, z) {
     if (Math.abs(x) + Math.abs(y) + Math.abs(z) != 1 || x * y != 0 || x * z != 0 || y * z != 0)
       throw new Error('Invalid direction.')
@@ -79,12 +74,12 @@ class CubeWrapperSide extends THREE.Group {
       color: 0xffff00,
       side: THREE.DoubleSide
     })
-    var inner = new THREE.Mesh(geometry, materialI)
+    let inner = new THREE.Mesh(geometry, materialI)
     const materialO = new THREE.MeshBasicMaterial({
       color: 0xffffaa,
       side: THREE.DoubleSide
     })
-    var outer = new THREE.Mesh(geometry, materialO)
+    let outer = new THREE.Mesh(geometry, materialO)
     inner.position.z += CubeWrapperSide.thickness / 2
     outer.position.z -= CubeWrapperSide.thickness / 2
     this.add(inner)
@@ -176,7 +171,7 @@ class CubeWrapperSide extends THREE.Group {
       throw new Error('Rate must be in [0, 1]')
     const center = new THREE.Vector3().copy(axis).multiplyScalar(size)
     const p = this.#getRefPosition()
-    var d0, d1, d2
+    let d0, d1, d2
     if (direction.x) {
       d0 = 'x'
       d1 = 'y'
@@ -204,6 +199,50 @@ class CubeWrapperSide extends THREE.Group {
   }
 }
 
+class Step {
+  // start + translate + [pause + flip] * 5 + done + [flip + pause] * 5 + translate + end
+  static init = new Step(0)
+  static start = new Step(10)
+  static translate = new Step(10)
+  static pause = new Step(3)
+  static flip = new Step(10)
+  static done = new Step(20)
+  static end = new Step(10)
+  static sleep = new Step(0)
+
+  static totalTime = Step.start.t + Step.translate.t * 2 + (Step.pause.t +
+                     Step.flip.t) * 10 + Step.done.t + Step.end.t
+
+  constructor(duration) {
+    this.t = duration
+  }
+
+  static getStep(time) {
+    if (time == 0) return [Step.init]
+    if (time <= Step.start.t) return [Step.sleep]
+    time -= Step.start.t
+    if (time <= Step.translate.t) return [Step.translate, true, time / Step.translate.t]
+    time -= Step.translate.t
+    if (time <= 5 * (Step.pause.t + Step.flip.t)) {
+      let div = Math.floor((time - 1) / (Step.pause.t + Step.flip.t))
+      let rem = (time - 1) % (Step.pause.t + Step.flip.t) + 1
+      if (rem <= Step.pause.t) return [Step.sleep]
+      return [Step.flip, div, true, (rem - Step.pause.t) / Step.flip.t]
+    }
+    time -= 5 * (Step.pause.t + Step.flip.t)
+    if (time <= Step.done.t) return [Step.sleep]
+    time -= Step.done.t
+    if (time <= 5 * (Step.pause.t + Step.flip.t)) {
+      let div = Math.floor((time - 1) / (Step.pause.t + Step.flip.t))
+      let rem = (time - 1) % (Step.pause.t + Step.flip.t) + 1
+      if (rem <= Step.flip.t) return [Step.flip, 4 - div, false, rem / Step.flip.t]
+      return [Step.sleep]
+    }
+    time -= 5 * (Step.pause.t + Step.flip.t)
+    if (time <= Step.translate.t) return [Step.translate, false, time / Step.translate.t]
+    return [Step.sleep]
+  }
+}
 
 function init() {
 
@@ -217,9 +256,9 @@ function init() {
 
   // volume
   const shrink = 0.99
-  var geometry = new THREE.BoxGeometry(size * shrink, size * shrink, size * shrink)
-  var material = new THREE.MeshNormalMaterial()
-  var volume = new THREE.Mesh(geometry, material)
+  let geometry = new THREE.BoxGeometry(size * shrink, size * shrink, size * shrink)
+  let material = new THREE.MeshNormalMaterial()
+  let volume = new THREE.Mesh(geometry, material)
   volume.position.set(size / 2, size / 2, size / 2)
   whole.add(volume)
   if (showingOrigin)
@@ -227,7 +266,7 @@ function init() {
 
   // wrapper
   wrapper = new THREE.Group()
-  for (var i = 0; i < 6; i++)
+  for (let i = 0; i < 6; i++)
     wrapper.add(new CubeWrapperSide())
   whole.add(wrapper)
 
@@ -244,38 +283,15 @@ function init() {
 
 
 function animate() {
-
-  requestAnimationFrame(animate)
-
-  const start = 10
-  const move = 10
-  const pause = 3
-  const end = 20
-  const animTime = start * 2 + move * 12 + pause * 10 * end
-
-  function beginMove(i) {
-    return start + i * (move + pause)
-  }
-
-  function endMove(i) {
-    return beginMove(i) + move
-  }
-
-  function rateInMove(i) {
-    return (time - beginMove(i)) / move
-  }
-
-  function totalTime() {
-    return 0
-  }
-
   const rotationX = whole.rotation.x
   const rotationY = whole.rotation.y
   whole.rotation.x = 0
   whole.rotation.y = 0
 
-  function animateCube1() {
-
+  function animateCube1(time) {
+    const xInit = -1
+    const yInit = 0
+    const zInit = -1
     const sidesXY = [
       [0, 0],
       [1, 0],
@@ -284,62 +300,56 @@ function animate() {
       [0, -1],
       [0, -2]
     ]
-    if (time == 0) {
-      for (var i = 0; i < wrapper.children.length; i++)
-        wrapper.children[i].setPosition({
-          x: sidesXY[i][0] + xInit,
-          y: sidesXY[i][1] + yInit,
-          z: zInit
-        })
-    } else if (beginMove(0) < time && time <= endMove(0)) {
-      for (var i = 0; i < wrapper.children.length; i++)
-        wrapper.children[i].translate({
-          x: sidesXY[i][0],
-          y: sidesXY[i][1],
-          z: 0
-        }, rateInMove(0))
-    } else if (beginMove(1) < time && time <= endMove(1)) {
-      wrapper.children[1].rotate(CubePosition.p100, Direction.negY, false, rateInMove(1))
-    } else if (beginMove(2) < time && time <= endMove(2)) {
-      wrapper.children[2].rotate(CubePosition.p010, Direction.posX, true, rateInMove(2))
-    } else if (beginMove(3) < time && time <= endMove(3)) {
-      wrapper.children[3].rotate(CubePosition.p000, Direction.posY, false, rateInMove(3))
-    } else if (beginMove(4) < time && time <= endMove(4)) {
-      wrapper.children[4].rotate(CubePosition.p000, Direction.negX, true, rateInMove(4))
-      wrapper.children[5].rotate(CubePosition.p000, Direction.negX, true, rateInMove(4))
-    } else if (beginMove(5) < time && time <= endMove(5)) {
-      wrapper.children[5].rotate(CubePosition.p001, Direction.negX, true, rateInMove(5))
-    } else if (beginMove(6) < time && time <= endMove(6)) {
-      wrapper.children[5].rotate(CubePosition.p001, Direction.posX, true, rateInMove(6))
-    } else if (beginMove(7) < time && time <= endMove(7)) {
-      wrapper.children[4].rotate(CubePosition.p000, Direction.posX, true, rateInMove(7))
-      wrapper.children[5].rotate(CubePosition.p000, Direction.posX, true, rateInMove(7))
-    } else if (beginMove(8) < time && time <= endMove(8)) {
-      wrapper.children[3].rotate(CubePosition.p000, Direction.negY, false, rateInMove(8))
-    } else if (beginMove(9) < time && time <= endMove(9)) {
-      wrapper.children[2].rotate(CubePosition.p010, Direction.negX, true, rateInMove(9))
-    } else if (beginMove(10) < time && time <= endMove(10)) {
-      wrapper.children[1].rotate(CubePosition.p100, Direction.posY, false, rateInMove(10))
-    } else if (beginMove(11) < time && time <= endMove(11)) {
-      for (var i = 0; i < wrapper.children.length; i++)
-        wrapper.children[i].translate({
+    const flips = [
+      [[1], CubePosition.p100, Direction.negY, Direction.posY, false],
+      [[2], CubePosition.p010, Direction.posX, Direction.negX, true],
+      [[3], CubePosition.p000, Direction.posY, Direction.negY, false],
+      [[4, 5], CubePosition.p000, Direction.negX, Direction.posX, true],
+      [[5], CubePosition.p001, Direction.negX, Direction.posX, true]
+    ]
+
+    let timeStep = Step.getStep(time)
+    switch (timeStep[0]) {
+      case Step.init:
+        for (let i = 0; i < wrapper.children.length; i++)
+          wrapper.children[i].setPosition({
             x: sidesXY[i][0] + xInit,
             y: sidesXY[i][1] + yInit,
             z: zInit
-          },
-          rateInMove(11))
+          })
+        break
+      case Step.translate:
+        for (let i = 0; i < wrapper.children.length; i++)
+          wrapper.children[i].translate({
+            x: sidesXY[i][0] + (timeStep[1] ? 0 : xInit),
+            y: sidesXY[i][1] + (timeStep[1] ? 0 : yInit),
+            z: timeStep[1] ? 0 : zInit
+          }, timeStep[2])
+        break
+      case Step.flip:
+        let flip = flips[timeStep[1]]
+        for (const side of flip[0])
+          wrapper.children[side].rotate(flip[1], timeStep[2] ? flip[2] : flip[3], flip[4],
+                                        timeStep[3])
+        break
     }
   }
 
-  animateCube1()
+  animateCube1(time)
 
   whole.rotation.x = rotationX + 0.02
   whole.rotation.y = rotationY + 0.01
 
   renderer.render(scene, camera)
-  globalTime = (globalTime + 1) % maxTime
-  time = (time + 1) % maxTime
+  time = (time + 1) % Step.totalTime
+
+  requestAnimationFrame(animate)
+
+
 }
 
+
+// Main
+
 init()
-animate()
+requestAnimationFrame(animate)
