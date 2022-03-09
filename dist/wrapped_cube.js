@@ -254,9 +254,9 @@ class Tile extends THREE.Group {
 class Step {
   static init = new Step(0)
   static begin = new Step(100)
-  static translate = new Step(20)
+  static translate = new Step(25)
   static spin = new Step(100)
-  static flip = new Step(30)
+  static flip = new Step(25)
   static end = new Step(100)
   // static begin = new Step(2)
   // static translate = new Step(2)
