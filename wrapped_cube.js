@@ -256,7 +256,7 @@ class Step {
   static begin = new Step(100)
   static translate = new Step(20)
   static spin = new Step(100)
-  static flip = new Step(300)
+  static flip = new Step(30)
   static end = new Step(100)
   // static begin = new Step(2)
   // static translate = new Step(2)
@@ -457,9 +457,9 @@ function animate() {
   }
 
   if (time % (2 * Step.totalTime) < Step.totalTime)
-    animateCube2(time % Step.totalTime)
-  else
     animateCube1(time % Step.totalTime)
+  else
+    animateCube2(time % Step.totalTime)
 
   renderer.render(scene, camera)
   time += 1
