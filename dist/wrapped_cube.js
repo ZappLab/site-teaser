@@ -89,14 +89,14 @@ class Tile extends THREE.Group {
     const geometry = new THREE.PlaneGeometry(Tile.size, Tile.size)
     const materialI = new THREE.MeshBasicMaterial({
       color: 0xffff00,
-      opacity: 0.7,
+      opacity: 0.6,
       transparent: true,
       side: THREE.DoubleSide
     })
     let inner = new THREE.Mesh(geometry, materialI)
     const materialO = new THREE.MeshBasicMaterial({
       color: 0xffffaa,
-      opacity: 0.7,
+      opacity: 0.6,
       transparent: true,
       side: THREE.DoubleSide
     })
@@ -251,10 +251,10 @@ class Tile extends THREE.Group {
 
 class Step {
   static init = new Step(0)
-  static begin = new Step(10)
+  static begin = new Step(100)
   static rotate = new Step(20)
   static translate = new Step(30)
-  static spin = new Step(3)
+  static spin = new Step(100)
   static flip = new Step(10)
   static end = new Step(10)
   // static begin = new Step(1)
@@ -272,7 +272,7 @@ class Step {
     [Step.rotate, 3], [Step.flip, 2, true],
     [Step.rotate, 4], [Step.flip, 3, true],
     [Step.rotate, 5], [Step.flip, 4, true],
-    [Step.spin],
+    [Step.translate, false], [Step.spin],
     [Step.rotate, 5], [Step.flip, 4, false],
     [Step.rotate, 4], [Step.flip, 3, false],
     [Step.rotate, 3], [Step.flip, 2, false],
@@ -318,6 +318,7 @@ function init() {
   let volume = new THREE.Mesh(geometry, material)
   volume.position.set(size / 2, size / 2, size / 2)
   whole.add(volume)
+  whole.position.set(-size / 2, -size / 2, -size / 2)
   if (showAxes)
     scene.add(new THREE.AxesHelper(50));
 
@@ -335,9 +336,9 @@ function init() {
 
   whole.scale.set(5, 5, 5)
   whole.position.set(0, 0, 0)
-  whole.rotation.x = Math.PI / 2 + 0.2
-  whole.rotation.y = Math.PI - 0.2
-  whole.rotation.z = 0
+  // whole.rotation.x = Math.PI / 2 + 0.2
+  // whole.rotation.y = Math.PI - 0.2
+  // whole.rotation.z = 0
 }
 
 
@@ -373,20 +374,59 @@ function animate() {
             y: sidesXY[i][1] + yInit,
             z: zInit
           })
+        whole.rotation.x = 0.2
+        whole.rotation.y = Math.PI - 0.2
+        whole.rotation.x = 0
         break
       case Step.translate:
-        for (let i = 0; i < wrapper.children.length; i++)
+        if (timeStep[1]) {
+          for (let i = 0; i < wrapper.children.length; i++)
           wrapper.children[i].translate({
             x: sidesXY[i][0] + (timeStep[1] ? 0 : xInit),
             y: sidesXY[i][1] + (timeStep[1] ? 0 : yInit),
             z: timeStep[1] ? 0 : zInit
           }, timeStep[2], timeStep[0].t)
+        } else if (timeStep[2] < timeStep[0].t) {
+          const p = new THREE.Vector3().copy(whole.position)
+          const new_p = new THREE.Vector3(0, 0, 0)
+          const rate = 1 / (timeStep[0].t - timeStep[2])
+          whole.position.addVectors(p.multiplyScalar(1 - rate), new_p.multiplyScalar(rate))
+        }
         break
       case Step.flip:
         let flip = flips[timeStep[1]]
         for (const side of flip[0])
           wrapper.children[side].rotate(
             flip[1], flip[2], flip[3] == timeStep[2], timeStep[3], timeStep[0].t)
+        break
+      case Step.rotate:
+        let quaternion = new THREE.Quaternion()
+        switch (timeStep[1]) {
+          case 0:
+            quaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 2 / timeStep[0].t)
+            whole.quaternion.premultiply(quaternion)
+            break
+          case 1:
+            quaternion.setFromAxisAngle(new THREE.Vector3(0.5, 0, 0), Math.PI / 2 / timeStep[0].t)
+            whole.quaternion.premultiply(quaternion)
+            break
+          case 3:
+            quaternion.setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI / 2 / timeStep[0].t)
+            whole.quaternion.premultiply(quaternion)
+            break
+          case 4:
+            quaternion.setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI / 2 / timeStep[0].t)
+            whole.quaternion.premultiply(quaternion)
+            break
+          case 5:
+            quaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 2 / timeStep[0].t)
+            whole.quaternion.premultiply(quaternion)
+            break
+          }
+        break
+      case Step.spin:
+        whole.rotation.x += 0.05
+        whole.rotation.y += 0.03
         break
     }
   }
