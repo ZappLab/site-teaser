@@ -2,9 +2,10 @@ import * as THREE from 'https://unpkg.com/three@0.127.0/build/three.module.js'
 // import * as Cube from './cube.js'
 
 const size = 2
+const scale = 5
 const showAxes = false
 
-var camera, scene, renderer, whole, wrapper, time
+var camera, scene, renderer, whole, volume, wrapper, time
 
 
 class Coord extends THREE.Vector3 {
@@ -89,14 +90,14 @@ class Tile extends THREE.Group {
     const geometry = new THREE.PlaneGeometry(Tile.size, Tile.size)
     const materialI = new THREE.MeshBasicMaterial({
       color: 0xffff00,
-      opacity: 0.6,
+      opacity: 0.5,
       transparent: true,
       side: THREE.DoubleSide
     })
     let inner = new THREE.Mesh(geometry, materialI)
     const materialO = new THREE.MeshBasicMaterial({
-      color: 0xffffaa,
-      opacity: 0.6,
+      color: 0xffffff,
+      opacity: 0.8,
       transparent: true,
       side: THREE.DoubleSide
     })
@@ -108,6 +109,28 @@ class Tile extends THREE.Group {
     this.normal = new Direction(normal.x, normal.y, normal.z)
     this.coord = new Coord(coord.x, coord.y, coord.z)
     this.resetPositionFromCoord()
+  }
+
+  static coordFromPosition(position, normal) {
+    // Returns the coord of on a position and a normal vector.
+    if (normal.x)
+      return new Coord(
+        Math.round(position.x / size),
+        Math.round(position.y / size - 0.5),
+        Math.round(position.z / size - 0.5)
+      )
+    if (normal.y)
+      return new Coord(
+        Math.round(position.x / size - 0.5),
+        Math.round(position.y / size),
+        Math.round(position.z / size - 0.5)
+      )
+    if (normal.z)
+      return new Coord(
+        Math.round(position.x / size - 0.5),
+        Math.round(position.y / size - 0.5),
+        Math.round(position.z / size)
+      )
   }
 
   static positionFromCoord(coord, normal) {
@@ -142,27 +165,6 @@ class Tile extends THREE.Group {
       this.position.set((coord.x + 0.5) * size, (coord.y + 0.5) * size, coord.z * size)
   }
 
-  static coordFromPosition(position) {
-    // Returns the coord of the tile based on its position.
-    if (this.normal.x)
-      return {
-        x: Math.round(position.x / size),
-        y: Math.round(position.y / size - 0.5),
-        z: Math.round(position.z / size - 0.5)
-      }
-    if (this.normal.y)
-      return {
-        x: Math.round(position.x / size - 0.5),
-        y: Math.round(position.y / size),
-        z: Math.round(position.z / size - 0.5)
-      }
-    if (this.normal.z)
-      return {
-        x: Math.round(position.x / size - 0.5),
-        y: Math.round(position.y / size - 0.5),
-        z: Math.round(position.z / size)
-      }
-  }
 
   resetCoordFromPosition(position = this.position) {
     // Set the coord based on the tile position.
@@ -252,39 +254,35 @@ class Tile extends THREE.Group {
 class Step {
   static init = new Step(0)
   static begin = new Step(100)
-  static rotate = new Step(20)
-  static translate = new Step(30)
+  static translate = new Step(20)
   static spin = new Step(100)
-  static flip = new Step(10)
-  static end = new Step(10)
-  // static begin = new Step(1)
-  // static rotate = new Step(1)
+  static flip = new Step(300)
+  static end = new Step(100)
+  // static begin = new Step(2)
   // static translate = new Step(2)
+  // static spin = new Step(2)
   // static flip = new Step(2)
-  // static spin = new Step(1)
-  // static end = new Step(1)
+  // static end = new Step(2)
 
   static flow = [
     [Step.begin],
-    [Step.rotate, 0], [Step.translate, true],
-    [Step.rotate, 1], [Step.flip, 0, true],
-    [Step.rotate, 2], [Step.flip, 1, true],
-    [Step.rotate, 3], [Step.flip, 2, true],
-    [Step.rotate, 4], [Step.flip, 3, true],
-    [Step.rotate, 5], [Step.flip, 4, true],
-    [Step.translate, false], [Step.spin],
-    [Step.rotate, 5], [Step.flip, 4, false],
-    [Step.rotate, 4], [Step.flip, 3, false],
-    [Step.rotate, 3], [Step.flip, 2, false],
-    [Step.rotate, 2], [Step.flip, 1, false],
-    [Step.rotate, 1], [Step.flip, 0, false],
-    [Step.rotate, 0], [Step.translate, false],
-    [Step.rotate, -1],
+    [Step.translate, 1],
+    [Step.flip, 1],
+    [Step.flip, 2],
+    [Step.flip, 3],
+    [Step.flip, 4],
+    [Step.flip, 5],
+    [Step.spin],
+    [Step.flip, -5],
+    [Step.flip, -4],
+    [Step.flip, -3],
+    [Step.flip, -2],
+    [Step.flip, -1],
+    [Step.translate, -1],
     [Step.end]
   ]
 
-  static totalTime = Step.init.t + Step.begin.t + Step.rotate.t * 13 + Step.translate.t * 2 +
-    Step.spin.t + Step.flip.t * 10 + Step.end.t
+  static totalTime = Step.begin.t + Step.translate.t * 2 + Step.spin.t + Step.flip.t * 10 + Step.end.t
 
   constructor(duration) {
     this.t = duration
@@ -315,10 +313,8 @@ function init() {
   const shrink = 0.99
   let geometry = new THREE.BoxGeometry(size * shrink, size * shrink, size * shrink)
   let material = new THREE.MeshNormalMaterial()
-  let volume = new THREE.Mesh(geometry, material)
-  volume.position.set(size / 2, size / 2, size / 2)
+  volume = new THREE.Mesh(geometry, material)
   whole.add(volume)
-  whole.position.set(-size / 2, -size / 2, -size / 2)
   if (showAxes)
     scene.add(new THREE.AxesHelper(50));
 
@@ -334,21 +330,20 @@ function init() {
   renderer.setSize(window.innerWidth, window.innerHeight)
   document.body.appendChild(renderer.domElement)
 
-  whole.scale.set(5, 5, 5)
-  whole.position.set(0, 0, 0)
-  // whole.rotation.x = Math.PI / 2 + 0.2
-  // whole.rotation.y = Math.PI - 0.2
-  // whole.rotation.z = 0
+  whole.scale.set(scale, scale, scale)
 }
 
 
 function animate() {
   requestAnimationFrame(animate)
 
+  function normedVector(x, y, z) {
+    return new THREE.Vector3(x, y, z).multiplyScalar(1 / Math.sqrt(x**2 + y**2 + z**2))
+  }
+
   function animateCube1(time) {
-    const xInit = -1
-    const yInit = 0
-    const zInit = -1
+    const wrapper_init_pos = new THREE.Vector3(-2, -2, -2)
+    const wrapper_pos = new THREE.Vector3(-1, -1, -1)
     const sidesXY = [
       [0, 0],
       [1, 0],
@@ -357,84 +352,56 @@ function animate() {
       [0, -1],
       [0, -2]
     ]
+
     const flips = [
-      [[1], Coord.p100, Direction.posY, true],
-      [[2], Coord.p010, Direction.negX, false],
-      [[3], Coord.p000, Direction.posY, false],
-      [[4, 5], Coord.p000, Direction.negX, true],
-      [[5], Coord.p001, Direction.negX, true]
+      [[1], Coord.p100, Direction.posY, true, new normedVector(0, 1, 0)],
+      [[2], Coord.p010, Direction.negX, false, new normedVector(0.5, 0, 0)],
+      [[3], Coord.p000, Direction.posY, false, new normedVector(1, 0, 0)],
+      [[4, 5], Coord.p000, Direction.negX, true, new normedVector(1, 0, 0)],
+      [[5], Coord.p001, Direction.negX, true, new normedVector(0, 1, 0)]
     ]
 
+    let quaternion = new THREE.Quaternion()
+    let step = new THREE.Vector3()
     let timeStep = Step.getStep(time)
     switch (timeStep[0]) {
       case Step.init:
-        for (let i = 0; i < wrapper.children.length; i++)
+        for (let i = 0; i < wrapper.children.length; i++) {
           wrapper.children[i].positionTileToCoord({
-            x: sidesXY[i][0] + xInit,
-            y: sidesXY[i][1] + yInit,
-            z: zInit
+            x: sidesXY[i][0],
+            y: sidesXY[i][1],
+            z: 0
           })
-        whole.rotation.x = 0.2
-        whole.rotation.y = Math.PI - 0.2
-        whole.rotation.x = 0
+          wrapper.children[i].rotation.set(0, 0, 0, 'XYZ')
+        }
+        wrapper.position.copy(wrapper_init_pos)
+        whole.position.set(0, 0, 0)
+        whole.rotation.set(0.2, Math.PI - 0.2, 0, 'XYZ')
         break
       case Step.translate:
-        if (timeStep[1]) {
-          for (let i = 0; i < wrapper.children.length; i++)
-          wrapper.children[i].translate({
-            x: sidesXY[i][0] + (timeStep[1] ? 0 : xInit),
-            y: sidesXY[i][1] + (timeStep[1] ? 0 : yInit),
-            z: timeStep[1] ? 0 : zInit
-          }, timeStep[2], timeStep[0].t)
-        } else if (timeStep[2] < timeStep[0].t) {
-          const p = new THREE.Vector3().copy(whole.position)
-          const new_p = new THREE.Vector3(0, 0, 0)
-          const rate = 1 / (timeStep[0].t - timeStep[2])
-          whole.position.addVectors(p.multiplyScalar(1 - rate), new_p.multiplyScalar(rate))
-        }
+        step.copy(wrapper_init_pos).sub(wrapper_pos).multiplyScalar(timeStep[1] / timeStep[0].t)
+        wrapper.position.sub(step)
         break
       case Step.flip:
-        let flip = flips[timeStep[1]]
+        let flip = flips[Math.abs(timeStep[1]) - 1]
         for (const side of flip[0])
           wrapper.children[side].rotate(
-            flip[1], flip[2], flip[3] == timeStep[2], timeStep[3], timeStep[0].t)
-        break
-      case Step.rotate:
-        let quaternion = new THREE.Quaternion()
-        switch (timeStep[1]) {
-          case 0:
-            quaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 2 / timeStep[0].t)
-            whole.quaternion.premultiply(quaternion)
-            break
-          case 1:
-            quaternion.setFromAxisAngle(new THREE.Vector3(0.5, 0, 0), Math.PI / 2 / timeStep[0].t)
-            whole.quaternion.premultiply(quaternion)
-            break
-          case 3:
-            quaternion.setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI / 2 / timeStep[0].t)
-            whole.quaternion.premultiply(quaternion)
-            break
-          case 4:
-            quaternion.setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI / 2 / timeStep[0].t)
-            whole.quaternion.premultiply(quaternion)
-            break
-          case 5:
-            quaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 2 / timeStep[0].t)
-            whole.quaternion.premultiply(quaternion)
-            break
-          }
+            flip[1], flip[2], flip[3] == (timeStep[1] > 0), timeStep[2], timeStep[0].t)
+        quaternion.setFromAxisAngle(flip[4], Math.PI / 2 / timeStep[0].t)
+        whole.quaternion.premultiply(quaternion)
         break
       case Step.spin:
-        whole.rotation.x += 0.05
-        whole.rotation.y += 0.03
+        let axis = new THREE.Vector3(1, 2, 3)
+        axis.multiplyScalar(1 / Math.sqrt(axis.x ** 2 + axis.y ** 2 + axis.z ** 2))
+        quaternion.setFromAxisAngle(axis, Math.PI * 2 / timeStep[0].t)
+        whole.quaternion.premultiply(quaternion)
         break
     }
   }
 
   function animateCube2(time) {
-    const xInit = -1
-    const yInit = 0
-    const zInit = -1
+    const wrapper_init_pos = new THREE.Vector3(-2, -2, -2)
+    const wrapper_pos = new THREE.Vector3(-1, -1, -1)
     const sidesXY = [
       [0, 0],
       [0, 1],
@@ -444,101 +411,58 @@ function animate() {
       [1, -2]
     ]
     const flips = [
-      [[3, 4, 5], Coord.p100, Direction.negY, false],
-      [[4, 5], Coord.p100, Direction.posZ, false],
-      [[5], Coord.p000, Direction.posZ, false],
-      [[1, 2], Coord.p010, Direction.posX, true],
-      [[2], Coord.p011, Direction.posX, true],
+      [[3, 4, 5], Coord.p100, Direction.posY, true, normedVector(-1, 0, 0)],
+      [[4, 5], Coord.p100, Direction.negZ, true, normedVector(1, -1, 0)],
+      [[5], Coord.p000, Direction.negZ, true, normedVector(1, 0, 0)],
+      [[1, 2], Coord.p010, Direction.negX, false, normedVector(1, 0, 0)],
+      [[2], Coord.p011, Direction.negX, false, normedVector(0, -1, 0)],
     ]
 
+    let quaternion = new THREE.Quaternion()
+    let step = new THREE.Vector3()
     let timeStep = Step.getStep(time)
     switch (timeStep[0]) {
       case Step.init:
-        for (let i = 0; i < wrapper.children.length; i++)
-          wrapper.children[i].setPosition({
-            x: sidesXY[i][0] + xInit,
-            y: sidesXY[i][1] + yInit,
-            z: zInit
+        for (let i = 0; i < wrapper.children.length; i++) {
+          wrapper.children[i].positionTileToCoord({
+            x: sidesXY[i][0],
+            y: sidesXY[i][1],
+            z: 0
           })
+          wrapper.children[i].rotation.set(0, 0, 0, 'XYZ')
+        }
+        wrapper.position.copy(wrapper_init_pos)
+        whole.position.set(0, 0, 0)
+        whole.rotation.set(0.2, Math.PI - 0.2, 0, 'XYZ')
         break
       case Step.translate:
-        for (let i = 0; i < wrapper.children.length; i++)
-          wrapper.children[i].translate({
-            x: sidesXY[i][0] + (timeStep[1] ? 0 : xInit),
-            y: sidesXY[i][1] + (timeStep[1] ? 0 : yInit),
-            z: timeStep[1] ? 0 : zInit
-          }, timeStep[2])
+        step.copy(wrapper_init_pos).sub(wrapper_pos).multiplyScalar(timeStep[1] / timeStep[0].t)
+        wrapper.position.sub(step)
         break
       case Step.flip:
-        let flip = flips[timeStep[1]]
+        let flip = flips[Math.abs(timeStep[1]) - 1]
         for (const side of flip[0])
           wrapper.children[side].rotate(
-            flip[1], timeStep[2] ? flip[2] : flip[2].opposite(), flip[3], timeStep[3])
+            flip[1], flip[2], flip[3] == (timeStep[1] > 0), timeStep[2], timeStep[0].t)
+        quaternion.setFromAxisAngle(flip[4], Math.PI / 2 / timeStep[0].t)
+        whole.quaternion.premultiply(quaternion)
+        break
+      case Step.spin:
+        let axis = new THREE.Vector3(1, 2, 3)
+        axis.multiplyScalar(1 / Math.sqrt(axis.x ** 2 + axis.y ** 2 + axis.z ** 2))
+        quaternion.setFromAxisAngle(axis, Math.PI * 2 / timeStep[0].t)
+        whole.quaternion.premultiply(quaternion)
         break
     }
   }
 
-  // let quaternion = new THREE.Quaternion()
-  // // const sqrt22 = Math.sqrt(2) / 2
-  // // const qxpos = new THREE.Quaternion(sqrt22, 0, 0, sqrt22)
-  // // const qypos = new THREE.Quaternion(0, sqrt22, 0, sqrt22)
-  // // const qzpos = new THREE.Quaternion(0, 0, sqrt22, sqrt22)
-  // const animateCubes = [animateCube2]  //, animateCube2]
-  // // animateCubes[Math.floor((time % (animateCubes.length * Step.totalTime)) / Step.totalTime)](time % Step.totalTime)
-  // if (time <= 1) {
-  //   wrapper.children[0].position.set(0, 0, -1)
-  // } else if (time <= 3) {
-  //   // wrapper.children[0].rotation.set(1, 0, 0)
-  //   // wrapper.children[0].quaternion.rotateTowards(qxpos, 0.075 * time)
-  //   // wrapper.children[0].quaternion.premultiply(qxpos)
-  //   quaternion.setFromAxisAngle(Direction.posX, Math.PI / 4);
-  //   wrapper.children[0].quaternion.premultiply(quaternion)
-  // } else if (time <= 5) {
-  //   // wrapper.children[0].quaternion.rotateTowards(qzpos, 0.075 * time)
-  //   // wrapper.children[0].quaternion.premultiply(qzpos)
-  //   // const current = wrapper.children[0].quaternion.clone()
-  //   // wrapper.children[0].quaternion.copy(qzpos)
-  //   // wrapper.children[0].quaternion.multiply(current)
-  //   // wrapper.children[0].quaternion.multiplyQuaternions(qzpos, qxpos)
-  //   quaternion.setFromAxisAngle(Direction.posZ, Math.PI / 4);
-  //   wrapper.children[0].quaternion.premultiply(quaternion)
-  // } else if (time <= 7) {
-  //   // wrapper.children[0].quaternion.rotateTowards(qzpos, 0.075 * time)
-  //   // const current = wrapper.children[0].quaternion.clone()
-  //   // wrapper.children[0].quaternion.copy(qypos)
-  //   // wrapper.children[0].quaternion.multiply(current)
-  //   // wrapper.children[0].quaternion.premultiply(qypos)
-  //   quaternion.setFromAxisAngle(Direction.posY, Math.PI / 4);
-  //   wrapper.children[0].quaternion.premultiply(quaternion)
-  // } else if (time <= 9) {
-  //   // wrapper.children[0].rotation.set(1, 0, 0)
-  //   // wrapper.children[0].quaternion.rotateTowards(qxpos, 0.075 * time)
-  //   // const current = wrapper.children[0].quaternion.clone()
-  //   // wrapper.children[0].quaternion.copy(qxpos)
-  //   // wrapper.children[0].quaternion.multiply(current)
-  //   // wrapper.children[0].quaternion.premultiply(qxpos)
-  //   quaternion.setFromAxisAngle(Direction.posX, Math.PI / 4);
-  //   wrapper.children[0].quaternion.premultiply(quaternion)
-  // }
-  // // wrapper.children[0].quaternion.multiply(new THREE.Quaternion(sqrt22, 0, 0, sqrt22))
-  // // else if (time==2)
-  // //   wrapper.children[0].quaternion.multiply(new THREE.Quaternion(0, sqrt22, 0, sqrt22))
-  // // else if (time==3)
-  // //   wrapper.children[0].quaternion.multiply(new THREE.Quaternion(0, 0, sqrt22, sqrt22))
-
   if (time % (2 * Step.totalTime) < Step.totalTime)
+    animateCube2(time % Step.totalTime)
+  else
     animateCube1(time % Step.totalTime)
-  // else
-  //   animateCube2(time % Step.totalTime)
-
-  // whole.rotation.x = rotationX + 0.02
-  // whole.rotation.y = rotationY + 0.01
 
   renderer.render(scene, camera)
   time += 1
-
-
-
 }
 
 
