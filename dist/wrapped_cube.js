@@ -258,11 +258,6 @@ class Step {
   static spin = new Step(100)
   static flip = new Step(25)
   static end = new Step(100)
-  // static begin = new Step(2)
-  // static translate = new Step(2)
-  // static spin = new Step(2)
-  // static flip = new Step(2)
-  // static end = new Step(2)
 
   static flow = [
     [Step.begin],
